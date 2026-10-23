@@ -10,6 +10,10 @@ execute:
 ```{r}
 library(tidyverse)
 library(scales)
+library(sf)
+library(tigris)
+
+options(tigris_use_cache = TRUE)
 
 # Extract the county files to a temporary directory and read them all in
 files <- unzip("2026-pri-outputofficial.zip", exdir = tempdir())
@@ -38,4 +42,53 @@ gov_rep |>
     caption = "Source: Florida Department of State"
   ) +
   theme_minimal()
+```
+
+```{r}
+# Find the top vote-getting gubernatorial candidate in each county
+county_winners <- raw_data |>
+  filter(X12 == "Governor", X16 %in% c("REP", "DEM")) |>
+  summarize(votes = sum(X19, na.rm = TRUE), .by = c(X2, X15, X16)) |>
+  slice_max(votes, n = 1, by = X2) |>
+  mutate(
+    county_key = str_to_lower(X2),
+    winner_label = paste0(X15, " (", X16, ")")
+  )
+
+# Load Florida county boundaries and join with the election winners
+fl_counties <- counties("FL", cb = TRUE, progress_bar = FALSE) |>
+  mutate(county_key = str_to_lower(NAME)) |>
+  left_join(county_winners, by = "county_key")
+
+# Create a single boundary outline for the entire state of Florida
+fl_state_outline <- st_union(fl_counties)
+
+# Map county winners with red shades for Republicans and blue for Democrats
+ggplot() +
+  geom_sf(
+    data = fl_counties,
+    aes(fill = winner_label),
+    color = "gray25",
+    linewidth = 0.3
+  ) +
+  geom_sf(
+    data = fl_state_outline,
+    fill = NA,
+    color = "black",
+    linewidth = 0.9
+  ) +
+  scale_fill_manual(
+    name = "County Winner",
+    values = c(
+      "Byron Donalds (REP)" = "#cb181d",
+      "Jay Collins (REP)" = "#fb6a4a",
+      "David Jolly and Gwen Graham (DEM)" = "#2171b5"
+    )
+  ) +
+  labs(
+    title = "2026 Florida Primary for Governor: Top Candidate by County",
+    subtitle = "Shades of red indicate Republican winners; blue indicates Democratic winner",
+    caption = "Source: Florida Department of State & U.S. Census Bureau (tigris)"
+  ) +
+  theme_void()
 ```
