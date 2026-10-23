@@ -1,5 +1,5 @@
 ---
-title: "2026 Florida Republican Primary for Governor"
+title: "How Florida Votes: Exploring Our 67 Counties!"
 format: html
 execute:
   echo: false
@@ -7,7 +7,20 @@ execute:
   warning: false
 ---
 
+When Florida holds an election for Governor, voters all across the state cast their ballots. To help organize elections and local government, the state of Florida is divided into **67 counties**—think of them like 67 puzzle pieces that fit together to make up our state!
+
+### Who Won each County?
+
+Every county counts the votes cast by the people who live there. In the map below:
+
+- The **bold black line** shows the outline of the entire state of **Florida**.
+- The **white lines** inside show each of Florida's **67 counties**.
+- **Red counties** had a **Republican** candidate win the most votes in that county.
+- **Blue counties** had a **Democratic** candidate win the most votes in that county.
+
 ```{r}
+#| fig-width: 9
+#| fig-height: 8
 library(tidyverse)
 library(scales)
 library(sf)
@@ -23,28 +36,6 @@ raw_data <- read_tsv(
   col_types = cols(.default = "c", X19 = "d")
 )
 
-# Filter to the Republican primary for Governor and sum votes by candidate
-gov_rep <- raw_data |>
-  filter(X12 == "Governor", X16 == "REP") |>
-  summarize(votes = sum(X19, na.rm = TRUE), .by = X15) |>
-  rename(candidate = X15)
-
-# Plot a horizontal bar chart ordered by vote total
-gov_rep |>
-  ggplot(aes(x = votes, y = fct_reorder(candidate, votes))) +
-  geom_col(fill = "#b22222") +
-  scale_x_continuous(labels = label_comma()) +
-  labs(
-    title = "2026 Florida Republican Primary Results for Governor",
-    subtitle = "Statewide official vote totals by candidate",
-    x = "Total Votes",
-    y = NULL,
-    caption = "Source: Florida Department of State"
-  ) +
-  theme_minimal()
-```
-
-```{r}
 # Find the top vote-getting gubernatorial candidate in each county
 county_winners <- raw_data |>
   filter(X12 == "Governor", X16 %in% c("REP", "DEM")) |>
@@ -52,7 +43,11 @@ county_winners <- raw_data |>
   slice_max(votes, n = 1, by = X2) |>
   mutate(
     county_key = str_to_lower(X2),
-    winner_label = paste0(X15, " (", X16, ")")
+    winner_label = case_when(
+      X15 == "Byron Donalds" ~ "Byron Donalds (Republican - 39 counties)",
+      X15 == "Jay Collins" ~ "Jay Collins (Republican - 15 counties)",
+      TRUE ~ "David Jolly & Gwen Graham (Democrat - 13 counties)"
+    )
   )
 
 # Load Florida county boundaries and join with the election winners
@@ -63,32 +58,68 @@ fl_counties <- counties("FL", cb = TRUE, progress_bar = FALSE) |>
 # Create a single boundary outline for the entire state of Florida
 fl_state_outline <- st_union(fl_counties)
 
-# Map county winners with red shades for Republicans and blue for Democrats
+# Map county winners like puzzle pieces inside the state of Florida
 ggplot() +
   geom_sf(
     data = fl_counties,
     aes(fill = winner_label),
-    color = "gray25",
-    linewidth = 0.3
+    color = "white",
+    linewidth = 0.5
   ) +
   geom_sf(
     data = fl_state_outline,
     fill = NA,
-    color = "black",
-    linewidth = 0.9
+    color = "#1a1a1a",
+    linewidth = 1.1
   ) +
   scale_fill_manual(
-    name = "County Winner",
+    name = "Most Votes in the County",
     values = c(
-      "Byron Donalds (REP)" = "#cb181d",
-      "Jay Collins (REP)" = "#fb6a4a",
-      "David Jolly and Gwen Graham (DEM)" = "#2171b5"
+      "Byron Donalds (Republican - 39 counties)" = "#e63946",
+      "Jay Collins (Republican - 15 counties)" = "#ff8fa3",
+      "David Jolly & Gwen Graham (Democrat - 13 counties)" = "#1d70b8"
     )
   ) +
   labs(
-    title = "2026 Florida Primary for Governor: Top Candidate by County",
-    subtitle = "Shades of red indicate Republican winners; blue indicates Democratic winner",
-    caption = "Source: Florida Department of State & U.S. Census Bureau (tigris)"
+    title = "Florida's 67 County Puzzle: Who Got the Most Votes?",
+    subtitle = "Each puzzle piece is one county inside the state of Florida",
+    caption = "Source: Florida Department of State & U.S. Census Bureau"
   ) +
-  theme_void()
+  theme_void(base_size = 13) +
+  theme(
+    plot.background = element_rect(fill = "#f8f9fa", color = NA),
+    panel.background = element_rect(fill = "#d8f3fc", color = NA),
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5, margin = margin(t = 10, b = 4)),
+    plot.subtitle = element_text(size = 12, hjust = 0.5, margin = margin(b = 10)),
+    legend.position = "bottom",
+    legend.direction = "vertical",
+    legend.title = element_text(face = "bold"),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+```
+
+### Total Votes Across All 67 Counties (Republican Primary)
+
+When we add up the votes from all 67 counties together, we get the statewide total! Here is how many votes each candidate received across the whole state in the Republican primary for Governor:
+
+```{r}
+# Filter to the Republican primary for Governor and sum votes by candidate
+gov_rep <- raw_data |>
+  filter(X12 == "Governor", X16 == "REP") |>
+  summarize(votes = sum(X19, na.rm = TRUE), .by = X15) |>
+  rename(candidate = X15)
+
+# Plot a horizontal bar chart ordered by vote total
+gov_rep |>
+  ggplot(aes(x = votes, y = fct_reorder(candidate, votes))) +
+  geom_col(fill = "#e63946") +
+  scale_x_continuous(labels = label_comma()) +
+  labs(
+    title = "2026 Florida Republican Primary Results for Governor",
+    subtitle = "Statewide vote totals added up from all 67 counties",
+    x = "Total Votes",
+    y = NULL,
+    caption = "Source: Florida Department of State"
+  ) +
+  theme_minimal(base_size = 13)
 ```
